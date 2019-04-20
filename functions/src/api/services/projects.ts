@@ -24,7 +24,7 @@ function create_test_job(db: DatabaseInterface, project: any, platform: string, 
         browser: browser
     };
 
-    db.create(job)
+    db.create(job).catch((e) => console.error(e));
 }
 
 function create_build_job(db: DatabaseInterface, project: any, platform: string) {
@@ -45,7 +45,25 @@ function create_build_job(db: DatabaseInterface, project: any, platform: string)
         platform: platform
     };
 
-    db.create(job)
+    db.create(job).catch((e) => console.error(e));
+}
+
+function hasThePlatform(configPlatform: any, platform: string) {
+    for (const p in configPlatform) {
+        if (configPlatform[p].name === platform) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function getBrowsers(configPlatform: any, platform: string) {
+    for (const p in configPlatform) {
+        if (configPlatform[p].name === platform) {
+            return configPlatform[p].browsers;
+        }
+    }
+    return [];
 }
 
 function remove_test_jobs(db: DatabaseInterface, project: any, config: any) {
@@ -58,13 +76,13 @@ function remove_test_jobs(db: DatabaseInterface, project: any, config: any) {
                 const job: any = project.data.jobs['test'][j];
 
                 if (!project.data.test_jobs.includes(job.platform)) {
-                    db.delete(j).catch((e) => (console.error(e)));
+                    db.delete(j).catch((e) => console.error(e));
                 } else {
-                    if (!config.available_test_platforms.hasOwnProperty(job.platform)){
-                        db.delete(j).catch((e) => (console.error(e)));
-                    }else {
-                        if (!config.available_test_platforms[job.platform].includes(job.browser)){
-                            db.delete(j).catch((e) => (console.error(e)));
+                    if (!hasThePlatform(config.test, job.platform)) {
+                        db.delete(j).catch((e) => console.error(e));
+                    } else {
+                        if (!getBrowsers(config.test, job.platform).includes(job.browser)) {
+                            db.delete(j).catch((e) => console.error(e));
                         }
                     }
                 }
@@ -84,10 +102,10 @@ function remove_build_jobs(db: DatabaseInterface, project: any, config: any) {
                 const job: any = project.data.jobs['build'][j];
 
                 if (!project.data.build_jobs.includes(job.platform)) {
-                    db.delete(j).catch((e) => (console.error(e)));
+                    db.delete(j).catch((e) => console.error(e));
                 } else {
-                    if (!config.available_build_platforms.includes(job.platform)){
-                        db.delete(j).catch((e) => (console.error(e)));
+                    if (!hasThePlatform(config.build, job.platform)) {
+                        db.delete(j).catch((e) => console.error(e));
                     }
                 }
 
@@ -122,10 +140,10 @@ function projectHasTheJob(project: any, type: string, platform: string, browser?
     return false;
 }
 
-function sync_jobs(admin_firebase: any, projectId: string, isCreation: boolean) {
+async function sync_jobs(admin_firebase: any, projectId: string, isCreation: boolean) {
 
     const config_db = new DatabaseInterface(
-        admin_firebase, 'global_configuration'
+        admin_firebase, 'configuration/platforms'
     );
 
     config_db.read()
@@ -137,34 +155,31 @@ function sync_jobs(admin_firebase: any, projectId: string, isCreation: boolean) 
                 .then((project) => {
 
                     let local_db = new DatabaseInterface(
-                    admin_firebase, `projects/${project.id}/jobs/test`
-                );
+                        admin_firebase, `projects/${project.id}/jobs/test`
+                    );
 
                     if (project.data.hasOwnProperty('test_jobs')) {
 
-                        for (let j in project.data.test_jobs) {
+                        for (const j in project.data.test_jobs) {
 
-                            if (project.data.test_jobs.hasOwnProperty(j)) {
+                            const platform = project.data.test_jobs[j];
 
-                                const platform = project.data.test_jobs[j];
+                            const browsers = getBrowsers(config.test, platform);
 
-                                for (let b in config.available_test_platforms[platform]) {
+                            for (const b in browsers) {
 
-                                    const browser = config.available_test_platforms[platform][b];
+                                const hasTheJob = projectHasTheJob(project.data, 'TEST', platform, browsers[b]);
 
-                                    const hasTheJob = projectHasTheJob(project.data, 'TEST', platform, browser);
-
-                                    if (isCreation || !hasTheJob) {
-                                        create_test_job(
-                                            local_db,
-                                            project,
-                                            platform,
-                                            browser
-                                        );
-                                    }
+                                if (isCreation || !hasTheJob) {
+                                    create_test_job(
+                                        local_db,
+                                        project,
+                                        platform,
+                                        browsers[b]
+                                    );
                                 }
-
                             }
+
                         }
 
                     } else {
@@ -181,7 +196,7 @@ function sync_jobs(admin_firebase: any, projectId: string, isCreation: boolean) 
 
                     if (project.data.hasOwnProperty('build_jobs')) {
 
-                        for (let j in project.data.build_jobs) {
+                        for (const j in project.data.build_jobs) {
 
                             const platform = project.data.build_jobs[j];
 
@@ -199,8 +214,10 @@ function sync_jobs(admin_firebase: any, projectId: string, isCreation: boolean) 
                     }
 
                 })
+                .catch((e) => console.error(e));
 
-        });
+        })
+        .catch((e) => console.error(e));
 
 }
 
@@ -243,9 +260,13 @@ function getProjectRouter(admin_firebase: any) {
             await db.create(req.body)
                 .then((project: any) => {
 
-                    sync_jobs(admin_firebase, project.id, true);
-
-                    res.json(project);
+                    sync_jobs(admin_firebase, project.id, true)
+                        .then(() => {
+                            res.json(project);
+                        })
+                        .catch(() => {
+                            res.json(project);
+                        })
 
                 })
         } catch (e) {
@@ -257,9 +278,13 @@ function getProjectRouter(admin_firebase: any) {
         try {
             await db.update(req.params.id, req.body, function (project: any) {
 
-                sync_jobs(admin_firebase, project.id, false);
-
-                res.json(project);
+                sync_jobs(admin_firebase, project.id, false)
+                    .then(() => {
+                        res.json(project);
+                    })
+                    .catch(() => {
+                        res.json(project);
+                    })
 
             })
         } catch (e) {

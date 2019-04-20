@@ -17,14 +17,15 @@ function getJobRouter(admin_firebase: any) {
         }
     });
 
-    router.get('/projects/:projectId/jobs/:id', async (req, res, next) => {
+    router.get('/projects/:projectId/jobs/:type/:id', async (req, res, next) => {
         try {
             const id = req.params.id;
+            const type = req.params.type;
 
-            await db.setParent(`projects/${req.params.projectId}`).getOne(id)
+            await db.setReference(`projects/${req.params.projectId}/jobs/${type}`).getOne(id)
                 .then((job: any) => {
                     if (!job) {
-                        res.status(404).json({message: 'Project does not exists'})
+                        res.status(404).json({message: 'Job does not exists'})
                     } else {
                         res.json(job);
                     }
@@ -35,10 +36,11 @@ function getJobRouter(admin_firebase: any) {
         }
     });
 
-    router.post('/projects/:projectId/jobs/', async (req, res, next) => {
+    router.post('/projects/:projectId/jobs/:type/:id', async (req, res, next) => {
         try {
-
-            await db.setParent(`projects/${req.params.projectId}`).create(req.body)
+            const type = req.params.type;
+            await db.setReference(`projects/${req.params.projectId}/jobs/${type}`)
+                .create(req.body)
                 .then((job: any) => {
                     res.json(job);
                 })
@@ -48,11 +50,13 @@ function getJobRouter(admin_firebase: any) {
         }
     });
 
-    router.put('/projects/:projectId/jobs/:id', async (req, res, next) => {
+    router.put('/projects/:projectId/jobs/:type/:id', async (req, res, next) => {
         try {
-            await db.setParent(`projects/${req.params.projectId}`).update(req.params.id, req.body, function (job: any) {
-                res.json(job);
-            })
+            const type = req.params.type;
+            await db.setReference(`projects/${req.params.projectId}/jobs/${type}`)
+                .update(req.params.id, req.body, function (job: any) {
+                    res.json(job);
+                })
         } catch (e) {
             next(e);
         }
@@ -61,7 +65,8 @@ function getJobRouter(admin_firebase: any) {
     router.delete('/projects/:projectId/jobs/:id', async (req, res, next) => {
         try {
             const id = req.params.id;
-            await db.setParent(`projects/${req.params.projectId}`).delete(id);
+            const type = req.params.type;
+            await db.setReference(`projects/${req.params.projectId}/jobs/${type}`).delete(id);
             res.json({
                 id
             });
