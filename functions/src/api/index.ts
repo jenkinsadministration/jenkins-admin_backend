@@ -1,8 +1,10 @@
 import getProjectRouter from "./services/projects";
 import getJobRouter from "./services/jenkins_jobs";
-import getConfigRouter from "./services/global_configuration";
 import getPluginRouter from "./services/plugins";
 import getPlatformRouter from "./services/platforms";
+import getEnvironmentVarRouter from "./services/environment_vars";
+import getToolConfigurationRouter from "./services/tool_configuration";
+import getCredentialRouter from "./services/credentials";
 
 const express = require('express');
 const admin = require('firebase-admin');
@@ -65,8 +67,10 @@ app.use(express.json());
 
 app.use(getProjectRouter(defaultApp));
 app.use(getJobRouter(defaultApp));
-app.use(getConfigRouter(defaultApp));
 app.use(getPluginRouter(defaultApp));
 app.use(getPlatformRouter(defaultApp));
+app.use(getEnvironmentVarRouter(defaultApp));
+app.use(getToolConfigurationRouter(defaultApp));
+app.use(getCredentialRouter(defaultApp));
 
 export default app;
