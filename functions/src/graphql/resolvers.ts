@@ -49,6 +49,37 @@ const resolvers: any = {
                 });
             return pluginsResult;
         },
+        async jobs(){
+            let jobsResult: any[] = [];
+            await new DatabaseInterface(admin_firebase, 'projects')
+                .read()
+                .then((projects: any) => {
+
+                    for (const k in projects) {
+                        if (projects.hasOwnProperty(k)) {
+
+                            if (projects[k].hasOwnProperty('jobs')) {
+                                const jobs: any = projects[k]['jobs'];
+
+                                const test_jobs = jobs.hasOwnProperty('test') ? jobs['test'] : [];
+                                const build_jobs = jobs.hasOwnProperty('build') ? jobs['build'] : [];
+
+                                for (const j in test_jobs) {
+                                    jobsResult.push(test_jobs[j]);
+                                }
+
+                                for (const j in build_jobs) {
+                                    jobsResult.push(build_jobs[j]);
+                                }
+                            }
+
+                        }
+                    }
+                }).catch((e) => {
+                    console.error(e);
+                });
+            return jobsResult;
+        },
         async projects() {
             let projectsResult: any[] = [];
             await new DatabaseInterface(admin_firebase, 'projects')
@@ -93,6 +124,7 @@ const resolvers: any = {
             return projectsResult;
         }
     },
+    Job: {},
     Credential: {},
     EnvironmentVar: {},
     ToolConfiguration: {},

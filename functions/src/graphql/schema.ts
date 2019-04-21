@@ -71,6 +71,7 @@ type Query {
   credentials: [Credential]
   environment_vars: [EnvironmentVar]
   plugins: [Plugin]
+  jobs: [Job]
   projects: [Project]
   tool_configurations: [ToolConfiguration]
 }
