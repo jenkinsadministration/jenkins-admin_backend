@@ -22,7 +22,7 @@ graphQLServer.use(
 // /api/graphiql
 graphQLServer.use(
     "/graphiql",
-    graphiqlExpress({ endpointURL: "/jenkinsadmin/us-central1/query/graphql" })
+    graphiqlExpress({ endpointURL: "/query/graphql" })
 );
 
 // /api/schema

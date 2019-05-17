@@ -1,9 +1,11 @@
 import {Router} from "express";
 import {DatabaseInterface} from "../../utils/database";
 
-function create_test_job(db: DatabaseInterface, project: any, platform: string, browser: string) {
+function create_test_job(db: DatabaseInterface, project: any, platform: string, browser: string, default_parameters: any[]) {
+    let full_name = project.data.path + '/Test/' + platform;
+    full_name += platform !== browser ? '_' + browser : '';
     const job = {
-        full_name: project.data.path + '/Test/' + platform,
+        full_name: full_name,
         setup: {
             template: 'test_template.xml',
             repository: '',
@@ -13,11 +15,8 @@ function create_test_job(db: DatabaseInterface, project: any, platform: string, 
                 poll_scm: '',
                 build: ''
             },
-            parameters: []
-        },
-        athenea_project: {
-            project_id: '',
-            environment_id: ''
+            slack_channel: '',
+            parameters: default_parameters ? default_parameters : []
         },
         type: 'TEST',
         platform: platform,
@@ -27,7 +26,7 @@ function create_test_job(db: DatabaseInterface, project: any, platform: string, 
     db.create(job).catch((e) => console.error(e));
 }
 
-function create_build_job(db: DatabaseInterface, project: any, platform: string) {
+function create_build_job(db: DatabaseInterface, project: any, platform: string, default_parameters: any[]) {
     const job = {
         full_name: project.data.path + '/Build/' + platform,
         setup: {
@@ -39,7 +38,8 @@ function create_build_job(db: DatabaseInterface, project: any, platform: string)
                 poll_scm: '',
                 build: ''
             },
-            parameters: []
+            slack_channel: '',
+            parameters: default_parameters ? default_parameters : []
         },
         type: 'BUILD',
         platform: platform
@@ -58,12 +58,17 @@ function hasThePlatform(configPlatform: any, platform: string) {
 }
 
 function getBrowsers(configPlatform: any, platform: string) {
+    const platformConfig = getPlatform(configPlatform, platform);
+    return platformConfig !== null ? platformConfig.browsers : [];
+}
+
+function getPlatform(configPlatform: any, platform: string) {
     for (const p in configPlatform) {
         if (configPlatform[p].name === platform) {
-            return configPlatform[p].browsers;
+            return configPlatform[p];
         }
     }
-    return [];
+    return null;
 }
 
 function remove_test_jobs(db: DatabaseInterface, project: any, config: any) {
@@ -175,7 +180,8 @@ async function sync_jobs(admin_firebase: any, projectId: string, isCreation: boo
                                         local_db,
                                         project,
                                         platform,
-                                        browsers[b]
+                                        browsers[b],
+                                        getPlatform(config.test, platform).default_parameters
                                     );
                                 }
                             }
@@ -201,7 +207,12 @@ async function sync_jobs(admin_firebase: any, projectId: string, isCreation: boo
                             const platform = project.data.build_jobs[j];
 
                             if (isCreation || !projectHasTheJob(project.data, 'BUILD', platform)) {
-                                create_build_job(local_db, project, platform);
+                                create_build_job(
+                                    local_db,
+                                    project,
+                                    platform,
+                                    getPlatform(config.test, platform).default_parameters
+                                );
                             }
                         }
 
